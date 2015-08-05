@@ -12,32 +12,31 @@ public class BaseDwnInfo implements Parcelable {
 		this.mDwnStatus = DwnStatus.STATUS_NONE;
 	}
 	
-	private int mDwnStatus;
+	protected int mDwnStatus;
 	
 	/**
 	 * 下载地址
 	 */
-	private String mUri;
+	protected String mUri;
 	
 	/**
 	 * 总大小
 	 */
-	private long mTotal_Size;
+	protected long mTotal_Size;
 	
 	/**
 	 * 当前大小
 	 */
-	private long mCurrent_Size;
+	protected long mCurrent_Size;
 	
 	/**
 	 * md5
 	 */
-	private String mMd5;
+	protected String mMd5;
 	
+	protected String mSavePath;
 	
-	private String mSavePath;
-	
-	private int mDuring;
+	protected int mDuring;
 
 	public int getmDwnStatus() {
 		return mDwnStatus;

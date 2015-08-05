@@ -155,7 +155,7 @@ public class File_DAO {
 			values.put(COL_PATH, info.getmSavePath());
 			long id = -1;
 			try {
-				id = db.insert(TABLE, "", values);
+				id = db.insertWithOnConflict(TABLE, "", values, SQLiteDatabase.CONFLICT_REPLACE);
 			} catch (Exception e) {
 				e.printStackTrace();
 			}

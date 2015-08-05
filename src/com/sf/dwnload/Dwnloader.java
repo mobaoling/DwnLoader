@@ -35,6 +35,12 @@ public interface Dwnloader extends Callable<Integer> {
 		
 		public static final int STATUS_FAIL_ERROR_CODE = 11;
 		
+		public static final int STATUS_FAIL_MD5_CHECK_FAIL = 13;  // md5 验证失败
+		
+		public static final int STATUS_FAIL_CONNECT_TIME_OUTL = 14;
+		
+		public static final int STATUS_FAIL_READ_TIME_OUTL = 15;
+		
 		public static int convert_Status(int status) {
 			
 			int convert = status & 0x000000ff;
@@ -53,6 +59,9 @@ public interface Dwnloader extends Callable<Integer> {
 			case STATUS_FAIL_SPACE_NOT_ENO:
 			case STATUS_FAIL_READ_FILE:
 			case STATUS_FAIL_ERROR_CODE:
+			case STATUS_FAIL_CONNECT_TIME_OUTL:
+			case STATUS_FAIL_READ_TIME_OUTL:
+			case STATUS_FAIL_MD5_CHECK_FAIL:
 			case STATUS_FAIL:
 				return STATUS_FAIL;
 			default:

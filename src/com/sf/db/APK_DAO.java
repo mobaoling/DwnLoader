@@ -1,9 +1,10 @@
 package com.sf.db;
 
+import android.content.ContentValues;
+import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 
 import com.sf.dwnload.dwninfo.APKDwnInfo;
-import com.sf.dwnload.dwninfo.BaseDwnInfo;
 
 
 public class APK_DAO {
@@ -29,16 +30,19 @@ public class APK_DAO {
 	
 	public static final String COL_ICON = "_iconurl";
 	
+	public static final String COL_APPNAME = "_appname";
+	
 	public static String getSQL() {
 		
 		StringBuilder sql = new StringBuilder();
 		sql.append("CREATE TABLE IF NOT EXISTS ").append(TABLE);
 		sql.append("   ( ");
 		sql.append(COL_URL).append(" TEXT NOT NULL PRIMARY KEY  UNIQUE ");
-		sql.append(" , ").append(COL_PKG).append(" TEXT ");
+		sql.append(" , ").append(COL_PKG).append(" TEXT NOT NULL ");
 		sql.append(" , ").append(COL_VSNAME).append(" TEXT ");
 		sql.append(" , ").append(COL_VSCODE).append(" INTEGER ");
 		sql.append(" , ").append(COL_ICON).append(" TEXT ");
+		sql.append(" , ").append(COL_APPNAME).append(" TEXT ");
 		sql.append("   ) ");
 		
 		return sql.toString();
@@ -64,10 +68,41 @@ public class APK_DAO {
 		return sql.toString();
 	}
 	
-	public BaseDwnInfo getDwnInfo(SQLiteDatabase db, String uri) {
+	public APKDwnInfo getDwnInfo(SQLiteDatabase db, String uri) {
 		
 		if (null != db) {
+			APKDwnInfo ret = null;
 			
+			if (null != db && db.isOpen()) {
+				
+				Cursor cursor = null;
+				try {
+					cursor = db.query(VIEW, new String[]{COL_URL, COL_PKG,COL_ICON, COL_VSCODE, COL_VSNAME}
+					, COL_URL + " = ? ", new String[]{uri}, null, null, null);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				
+				if (cursor.moveToNext()) {
+					String url = cursor.getString(0);
+					String pkg = cursor.getString(1);
+					String icon = cursor.getString(2);
+					int vscode = cursor.getInt(3);
+					String vsname = cursor.getString(4);
+					ret = new APKDwnInfo(url, pkg, vsname, vscode, icon, vsname);
+				}
+				
+				if (null != cursor) {
+					try {
+						cursor.close();
+					} catch (Exception e) {
+					}
+					
+				}
+				
+			}
+			
+			return ret;
 		}
 		
 		return null;
@@ -77,7 +112,20 @@ public class APK_DAO {
 	
 	public boolean insert(SQLiteDatabase db, APKDwnInfo apkInfo) {
 		
-		
+		if (null != db && db.isOpen()) {
+			
+			try {
+				ContentValues values = new ContentValues();
+				values.put(COL_ICON, apkInfo.getmIconUri());
+				values.put(COL_PKG, apkInfo.getmPkgName());
+				values.put(COL_URL, apkInfo.getmUri());
+				values.put(COL_VSCODE, apkInfo.getmVsCode());
+				values.put(COL_VSNAME, apkInfo.getmVsName());
+				long id = db.insertWithOnConflict(TABLE, "", values, SQLiteDatabase.CONFLICT_REPLACE);
+				return id != -1;
+			} catch (Exception e) {
+			}
+		}
 		return false;
 	}
 	

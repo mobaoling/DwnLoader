@@ -4,6 +4,7 @@ import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import com.sf.dwnload.dwninfo.APKDwnInfo;
 import com.sf.dwnload.dwninfo.BaseDwnInfo;
 
 public class DwnHelper extends SQLiteOpenHelper {
@@ -58,8 +59,26 @@ public class DwnHelper extends SQLiteOpenHelper {
 		 return mFile_Dao.getDwnInfo(getReadableDatabase(), uri);
 	}
 	
+	/**
+	 * 
+	 * @param uri
+	 * @return
+	 */
+	public APKDwnInfo getApkInfo(String uri) {
+		 return mApk_Dao.getDwnInfo(getReadableDatabase(), uri);
+	}
+	
+	/**
+	 * 
+	 * @param dwnInfo
+	 * @return
+	 */
 	public boolean insertBaseDwnInfo(BaseDwnInfo dwnInfo) {
 		return mFile_Dao.insert(getWritableDatabase(), dwnInfo);
+	}
+	
+	public boolean insertApkDwnInfo(APKDwnInfo apkInfo) {
+		return mApk_Dao.insert(getWritableDatabase(), apkInfo);
 	}
 	
 	public boolean updateBaseDwnInfo(BaseDwnInfo dwnInfo) {
