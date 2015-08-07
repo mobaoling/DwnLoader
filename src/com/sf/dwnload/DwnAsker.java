@@ -12,6 +12,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.sf.dwnload.Dwnloader.DwnStatus;
 import com.sf.dwnload.dwninfo.BaseDwnInfo;
@@ -139,6 +140,7 @@ public class DwnAsker {
 									}
 									
 									if (null != bsDwnInfo) {
+										Log.d("caojianbo", " dwnasker " + " progress change " + current + "  " + total  );
 										value.getValue().onProgressChange(uri,current, total);
 									}
 									break;
@@ -147,6 +149,7 @@ public class DwnAsker {
 									if (null != bsDwnInfo) {
 										value.getValue().onProgressChange(uri,current, total);
 									}
+									
 									mDwnOverList.add(uri);
 									break;
 									

@@ -1,5 +1,7 @@
 package com.sf.db;
 
+import java.util.List;
+
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
@@ -70,6 +72,15 @@ public class DwnHelper extends SQLiteOpenHelper {
 	
 	/**
 	 * 
+	 * @param uri
+	 * @return
+	 */
+	public List<APKDwnInfo> getApkInfoList() {
+		 return mApk_Dao.getDwnInfoList(getReadableDatabase());
+	}
+	
+	/**
+	 * 
 	 * @param dwnInfo
 	 * @return
 	 */
@@ -78,7 +89,37 @@ public class DwnHelper extends SQLiteOpenHelper {
 	}
 	
 	public boolean insertApkDwnInfo(APKDwnInfo apkInfo) {
-		return mApk_Dao.insert(getWritableDatabase(), apkInfo);
+		
+		boolean ret = false;
+		getWritableDatabase().beginTransaction();
+		try {
+			if (mApk_Dao.insert(getWritableDatabase(), apkInfo) && mFile_Dao.insert(getWritableDatabase(), apkInfo)) {
+				getWritableDatabase().setTransactionSuccessful();
+				ret = true;
+			};
+		} catch (Exception e) {
+		} finally {
+			getWritableDatabase().endTransaction();
+		}
+		
+		return ret;
+	}
+	
+	
+	public boolean deleteApkDwnInfo(String uri) {
+		boolean ret = false;
+		getWritableDatabase().beginTransaction();
+		try {
+			mApk_Dao.delete(getWritableDatabase(), uri);
+			mFile_Dao.delete(getWritableDatabase(), uri);
+			getWritableDatabase().setTransactionSuccessful();
+				ret = true;
+		} catch (Exception e) {
+		} finally {
+			getWritableDatabase().endTransaction();
+		}
+		
+		return ret;
 	}
 	
 	public boolean updateBaseDwnInfo(BaseDwnInfo dwnInfo) {

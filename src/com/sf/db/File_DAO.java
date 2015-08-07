@@ -97,6 +97,14 @@ public class File_DAO {
 		return ret;
 	}
 	
+	public void resetDB(SQLiteDatabase db) {
+		ContentValues values = new ContentValues();
+		values.put(COL_STATUS, DwnStatus.STATUS_NONE);
+		if (null !=db && db.isOpen() ) {
+			db.update(TABLE, values, COL_STATUS + " = ? ", new String[]{"" + DwnStatus.STATUS_DOWNLOADING});
+		}
+	}
+	
 	
 	public BaseDwnInfo getDwnInfo(SQLiteDatabase db, String uri) {
 		
@@ -182,6 +190,18 @@ public class File_DAO {
 				e.printStackTrace();
 			}
 			return id > 0;
+		}
+		return false;
+	}
+	
+	public boolean delete(SQLiteDatabase db, String uri) {
+		
+		if (null != db && db.isOpen()) {
+			
+			try {
+				return (db.delete(TABLE, COL_URL + " = ? ", new String[]{uri}) != 0);
+			} catch (Exception e) {
+			}
 		}
 		return false;
 	}

@@ -1,7 +1,9 @@
 package com.sf.dwnload;
 
+import java.io.File;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -11,6 +13,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.sf.db.DwnHelper;
@@ -65,10 +68,14 @@ public class DwnManager {
 		mFutureList = new HashMap<String, Future<Integer>>();
 		mTaskList = new HashMap<String, AbsDownloader>();
 		
+		resetDB();
 		mExecutor = (ThreadPoolExecutor)Executors.newFixedThreadPool(2);
 	}
 	
-	
+	private void resetDB() {
+		
+		
+	}
 	
 	/**
 	 * 下载状态改变回调结果
@@ -79,12 +86,19 @@ public class DwnManager {
 		public boolean onDwnStatusChange(String uri, int dwnResult) {
 			BaseDwnInfo info = mDwnList.get(uri);
 			info.setmDwnStatus(dwnResult);
-			Log.d("caojianbo", uri + " onDwnStatusChange " + dwnResult);
 			mDBHelper.updateBaseDwnInfo(info);
 			mContextHandler.notifyStatusChange(uri, dwnResult);
 			return true;
 		}
 	};
+	
+	/**
+	 * 获取所有APK下载任务
+	 * @return
+	 */
+	public List<APKDwnInfo> getApkDwnList() {
+		return mDBHelper.getApkInfoList();
+	}
 	
 	/**
 	 * 
@@ -95,19 +109,8 @@ public class DwnManager {
 		synchronized (DwnManager.class) {
 			BaseDwnInfo ret = mDwnList.get(uri);
 			if (null == ret) {
-				
 				APKDwnInfo apkInfo = mDBHelper.getApkInfo(uri);
 				if (null != apkInfo) {
-					BaseDwnInfo dwnInfo = mDBHelper.getDwnInfo(uri);
-					if (null != apkInfo && null != dwnInfo) {
-						apkInfo.setmCurrent_Size(dwnInfo.getmCurrent_Size());
-						apkInfo.setmDuring(dwnInfo.getmDuring());
-						apkInfo.setmDwnStatus(dwnInfo.getmDwnStatus());
-						apkInfo.setmMd5(dwnInfo.getmMd5());
-						apkInfo.setmSavePath(dwnInfo.getmSavePath());
-						apkInfo.setmTotal_Size(dwnInfo.getmTotal_Size());
-					}
-					
 					ret = apkInfo;
 					mDwnList.put(uri, ret);
 				} else {
@@ -116,9 +119,25 @@ public class DwnManager {
 						mDwnList.put(uri, ret);
 					}
 				}
-				
-				
 			}
+			
+			if (null != ret) {
+				
+				String path = ret.getmSavePath();
+				if (TextUtils.isEmpty(path) || (!(new File(path).exists()))) {
+					switch (ret.getmDwnStatus()) {
+//					case DwnStatus.STATUS_DOWNLOADING:  /// delete  
+//					case DwnStatus.STATUS_PAUSE:
+					case DwnStatus.STATUS_SUCCESS:
+						ret.setmDwnStatus(DwnStatus.STATUS_NONE);
+						mDBHelper.updateBaseDwnInfo(ret);
+						break;
+					default:
+						break;
+					}
+				}
+			}
+			
 			return ret;
 		}
 	}
@@ -133,19 +152,27 @@ public class DwnManager {
 			APKDwnInfo ret = (APKDwnInfo)mDwnList.get(uri);
 			if (null == ret) {
 				ret = mDBHelper.getApkInfo(uri);
-				BaseDwnInfo dwnInfo = mDBHelper.getDwnInfo(uri);
-				if (null != ret && null != dwnInfo) {
-					ret.setmCurrent_Size(dwnInfo.getmCurrent_Size());
-					ret.setmDuring(dwnInfo.getmDuring());
-					ret.setmDwnStatus(dwnInfo.getmDwnStatus());
-					ret.setmMd5(dwnInfo.getmMd5());
-					ret.setmSavePath(dwnInfo.getmSavePath());
-					ret.setmTotal_Size(dwnInfo.getmTotal_Size());
-				}
 				if (null != ret) {
 					mDwnList.put(uri, ret);
 				}
 			}
+			
+			if (null != ret) {
+				String path = ret.getmSavePath();
+				if (TextUtils.isEmpty(path) || (!(new File(path).exists()))) {
+					switch (ret.getmDwnStatus()) {
+//					case DwnStatus.STATUS_DOWNLOADING:
+//					case DwnStatus.STATUS_PAUSE:
+					case DwnStatus.STATUS_SUCCESS:
+						ret.setmDwnStatus(DwnStatus.STATUS_NONE);
+						mDBHelper.updateBaseDwnInfo(ret);
+						break;
+					default:
+						break;
+					}
+				}
+			}
+			
 			return ret;
 		}
 	}
@@ -160,19 +187,26 @@ public class DwnManager {
 			if (null != dwnIfo) {
 				
 				// 判断状态
-				int status = mDBHelper.getDwnStatus(dwnIfo.getmUri());  // 转换状态
+				BaseDwnInfo exist = getDwnInfo(dwnIfo.getmUri());
+				int status = null == exist ? DwnStatus.STATUS_NONE: exist.getmDwnStatus();  // 转换状态
 				switch (DwnStatus.convert_Status(status)) {
 				case DwnStatus.STATUS_NONE:
 				case DwnStatus.STATUS_FAIL:
 					boolean apksuccess = false;
-					if (dwnIfo instanceof APKDwnInfo) {
-						// 插入版本号等信息
-						apksuccess = mDBHelper.insertApkDwnInfo((APKDwnInfo)dwnIfo);
-					} 
+					
+					
+					dwnIfo.setmCurrent_Size(0);
 					
 					// 插入基本信息
 					dwnIfo.setmDwnStatus(DwnStatus.STATUS_DOWNLOADING);
-					if (apksuccess && mDBHelper.insertBaseDwnInfo(dwnIfo)) {
+					if (dwnIfo instanceof APKDwnInfo) {
+						// 插入版本号等信息
+						apksuccess = mDBHelper.insertApkDwnInfo((APKDwnInfo)dwnIfo);
+					} else {
+						apksuccess = mDBHelper.insertBaseDwnInfo(dwnIfo);
+					}
+					
+					if (apksuccess) {
 						AbsDownloader task = new AbsDownloader(dwnIfo, AbsDownloader.MODE_NEW, dir, mDwnCallback);
 						Future<Integer> ret = mExecutor.submit(task);
 						mDwnList.put(dwnIfo.getmUri(), dwnIfo);						// 修改状态
@@ -205,6 +239,7 @@ public class DwnManager {
 				int status = mDBHelper.getDwnStatus(dwnIfo.getmUri());
 				switch (status) {
 				case DwnStatus.STATUS_PAUSE:
+				case DwnStatus.STATUS_NONE:
 					Log.d("caojianbo", "继续下载");
 					// 插入基本信息
 					dwnIfo.setmDwnStatus(DwnStatus.STATUS_DOWNLOADING);
@@ -238,54 +273,74 @@ public class DwnManager {
 		if (null != uri) {
 			
 			Future<Integer> future = null;
-			synchronized (uri) {
-				BaseDwnInfo dwnInfo = mDwnList.get(uri);
+			BaseDwnInfo dwnInfo = null;
+			synchronized (DwnManager.class) {
+				dwnInfo = mDwnList.get(uri);
 				future = mFutureList.get(uri);
+			}
 				
-				// task 还未被执行
-				if (mExecutor.getQueue().contains(future)) {
-					
-					Log.d("caojianbo", "pause task 未执行");
-					synchronized (DwnManager.class) {
-						future.cancel(true);
-						dwnInfo.setmDwnStatus(DwnStatus.STATUS_PAUSE);
-						// 更新
-						mDBHelper.updateBaseDwnInfo(dwnInfo);
-					}
-					retBool  = true;
-				} else {
-					Log.d("caojianbo", "pause task 已经执行");
-					if (null != dwnInfo && null != future) {
-						Log.d("caojianbo", "pause");
-						synchronized (DwnManager.class) {
-							dwnInfo.setmDwnStatus(DwnStatus.STATUS_READY_PAUSE);
-							AbsDownloader task = mTaskList.get(dwnInfo.getmUri());
-							if (null != task) {
-								task.disconnect();
-							}
-						}
-						int ret = -1;						//TODO 初始值
-						try {
-							if (null != future) {
-								ret = future.get();
-							}
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						} catch (ExecutionException e) {
-							e.printStackTrace();
-						} catch (Exception e) {
-						}
-						
-						retBool = ( ret == DwnStatus.STATUS_PAUSE);
-					}
+			// task 还未被执行
+			if (mExecutor.getQueue().contains(future)) {
+				
+				Log.d("caojianbo", "pause task 未执行");
+				synchronized (DwnManager.class) {
+					future.cancel(true);
+					dwnInfo.setmDwnStatus(DwnStatus.STATUS_PAUSE);
+					// 更新
+					mDBHelper.updateBaseDwnInfo(dwnInfo);
 				}
-				
+				retBool  = true;
+			} else {
+				Log.d("caojianbo", "pause task 已经执行");
+				if (null != dwnInfo && null != future) {
+					Log.d("caojianbo", "pause");
+					synchronized (DwnManager.class) {
+						dwnInfo.setmDwnStatus(DwnStatus.STATUS_READY_PAUSE);
+						AbsDownloader task = mTaskList.get(dwnInfo.getmUri());
+						if (null != task) {
+							task.disconnect();
+						}
+					}
+					int ret = -1;						//TODO 初始值
+					try {
+						if (null != future) {
+							ret = future.get();
+						}
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					} catch (ExecutionException e) {
+						e.printStackTrace();
+					} catch (Exception e) {
+					}
+					
+					retBool = ( ret == DwnStatus.STATUS_PAUSE);
+				}
 			}
 			
-			
-			Log.d("caojianbo", "return "  +" time  " + (System.currentTimeMillis() - t1));
 		}
+		
+			Log.d("caojianbo", "return "  +" time  " + (System.currentTimeMillis() - t1));
 		return retBool;
+	}
+	
+	
+	public boolean delete(String uri) {
+		
+		if (pause(uri)) {
+			synchronized (DwnManager.class) {
+				
+				BaseDwnInfo info = getDwnInfo(uri);
+				if (null != info && !TextUtils.isEmpty(info.getmSavePath())) {
+					try {
+						new File(info.getmSavePath()).delete();
+					} catch (Exception e) {
+					}
+				}
+				mDBHelper.deleteApkDwnInfo(uri);
+			}
+			
+		}
+		return false;
 	}
 	
 	private void checkInMainThread() {

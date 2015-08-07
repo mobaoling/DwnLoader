@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import android.os.StatFs;
+import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 
@@ -87,6 +88,8 @@ public class AbsDownloader implements Dwnloader{
 	 */
 	@Override
 	public int dwnFile() {
+		
+		long beginTime = SystemClock.uptimeMillis();
 		
 		String uri = mDwnInfo.getmUri();
 		synchronized (DwnManager.class) {
@@ -171,6 +174,8 @@ public class AbsDownloader implements Dwnloader{
 				
 				dwnstatus = t.getDwnStatus();
 				responseCode = t.getResponseCode();
+				
+				Log.d("caojianbo", " get responsecode over " + responseCode);
 				
 				// 暂停
 				synchronized (DwnManager.class) {
@@ -325,9 +330,21 @@ public class AbsDownloader implements Dwnloader{
 		
 		if (dwnstatus == DwnStatus.STATUS_SUCCESS && !TextUtils.isEmpty(mDwnInfo.getmMd5())) {
 			// check md5
-			
-			
 		}
+		
+		
+		// 时间统计
+		
+		switch (dwnstatus) {
+		case DwnStatus.STATUS_SUCCESS:
+		case DwnStatus.STATUS_PAUSE:
+			mDwnInfo.setmDuring(mDwnInfo.getmDuring() + (int)(SystemClock.uptimeMillis() - beginTime));
+			break;
+
+		default:
+			break;
+		}
+		
 		synchronized (DwnManager.class) {
 			if (null != mCallback) {
 				mCallback.onDwnStatusChange(uri, dwnstatus);   					// 
