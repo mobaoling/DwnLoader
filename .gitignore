@@ -1,4 +1,5 @@
 bin/
+build/
 .classpath
 gen/
 proguard-project.txt

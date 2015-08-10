@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 
 import android.content.Context;
@@ -182,7 +183,7 @@ public class DwnManager {
 	 * @param dwnIfo 下载信息
 	 * @return int  <br/>开始下载 > 0 <br/> 下载失败  < 0
 	 */
-	public int dwnFile(final BaseDwnInfo dwnIfo, String dir) {
+	public int dwnFile(final BaseDwnInfo dwnIfo, AbsDownloader.DwnOption option, String ...dirs) {
 		synchronized (DwnManager.class) {
 			if (null != dwnIfo) {
 				
@@ -193,7 +194,6 @@ public class DwnManager {
 				case DwnStatus.STATUS_NONE:
 				case DwnStatus.STATUS_FAIL:
 					boolean apksuccess = false;
-					
 					
 					dwnIfo.setmCurrent_Size(0);
 					
@@ -207,7 +207,7 @@ public class DwnManager {
 					}
 					
 					if (apksuccess) {
-						AbsDownloader task = new AbsDownloader(dwnIfo, AbsDownloader.MODE_NEW, dir, mDwnCallback);
+						AbsDownloader task = new AbsDownloader(dwnIfo, AbsDownloader.MODE_NEW, mDwnCallback, option, dirs);
 						Future<Integer> ret = mExecutor.submit(task);
 						mDwnList.put(dwnIfo.getmUri(), dwnIfo);						// 修改状态
 						mFutureList.put(dwnIfo.getmUri(), ret);						// 结果列表
@@ -231,7 +231,7 @@ public class DwnManager {
 	 * @param dwnIfo 下载信息
 	 * @return int  <br/>开始下载 > 0 <br/> 下载失败  < 0
 	 */
-	public int continueDwnFile(final BaseDwnInfo dwnIfo, String dir) {
+	public int continueDwnFile(final BaseDwnInfo dwnIfo, AbsDownloader.DwnOption option, String... dir) {
 		
 		synchronized (DwnManager.class) {
 			if (null != dwnIfo) {
@@ -244,7 +244,7 @@ public class DwnManager {
 					// 插入基本信息
 					dwnIfo.setmDwnStatus(DwnStatus.STATUS_DOWNLOADING);
 					if (mDBHelper.updateBaseDwnInfo(dwnIfo)) {
-						AbsDownloader task = new AbsDownloader(dwnIfo, AbsDownloader.MODE_CONTINUE, dir, mDwnCallback);
+						AbsDownloader task = new AbsDownloader(dwnIfo, AbsDownloader.MODE_CONTINUE, mDwnCallback, option, dir);
 						Future<Integer> ret = mExecutor.submit(task);
 						mDwnList.put(dwnIfo.getmUri(), dwnIfo);						// 修改状态
 						mFutureList.put(dwnIfo.getmUri(), ret);						// 结果列表
@@ -336,8 +336,15 @@ public class DwnManager {
 					} catch (Exception e) {
 					}
 				}
-				mDBHelper.deleteApkDwnInfo(uri);
+				synchronized (DwnManager.class) {
+					mDBHelper.deleteApkDwnInfo(uri);
+					mDwnList.remove(uri);
+					mTaskList.remove(uri);
+					mFutureList.remove(uri);
+				}
 			}
+
+			return true;
 			
 		}
 		return false;
