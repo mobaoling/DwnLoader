@@ -75,7 +75,7 @@ public class DwnManager {
 	
 	private void resetDB() {
 		
-		
+		mDBHelper.resetDB();
 	}
 	
 	/**
@@ -280,7 +280,14 @@ public class DwnManager {
 			}
 				
 			// task 还未被执行
-			if (mExecutor.getQueue().contains(future)) {
+            if (null == future) {
+                synchronized (DwnManager.class) {
+                    dwnInfo.setmDwnStatus(DwnStatus.STATUS_PAUSE);
+                    // 更新
+                    mDBHelper.updateBaseDwnInfo(dwnInfo);
+                    retBool  = true;
+                }
+            } else if (mExecutor.getQueue().contains(future)) {
 				
 				Log.d("caojianbo", "pause task 未执行");
 				synchronized (DwnManager.class) {

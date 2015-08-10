@@ -140,7 +140,6 @@ public class DwnAsker {
 									}
 									
 									if (null != bsDwnInfo) {
-										Log.d("caojianbo", " dwnasker " + " progress change " + current + "  " + total  );
 										value.getValue().onProgressChange(uri,current, total);
 									}
 									break;

@@ -78,6 +78,10 @@ public class DwnHelper extends SQLiteOpenHelper {
 	public List<APKDwnInfo> getApkInfoList() {
 		 return mApk_Dao.getDwnInfoList(getReadableDatabase());
 	}
+
+    public void resetDB() {
+        mFile_Dao.resetDB(getWritableDatabase());
+    }
 	
 	/**
 	 * 

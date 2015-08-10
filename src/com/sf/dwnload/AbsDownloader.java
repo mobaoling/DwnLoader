@@ -22,6 +22,7 @@ import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
 
+import com.sf.DwnMd5;
 import com.sf.dwnload.DwnManager.IDwnCallback;
 import com.sf.dwnload.dwninfo.BaseDwnInfo;
 
@@ -172,7 +173,7 @@ public class AbsDownloader implements Dwnloader{
 				};
 				t.start();
 				try {
-					t.join(1000 * 30);
+					t.join(10);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -199,6 +200,10 @@ public class AbsDownloader implements Dwnloader{
 
 					long size = mConnection.getContentLength();
 					String dirResult = createDirFile(size, uri, mDirs);
+
+                    if (mMode == MODE_NEW) {
+                        mDwnInfo.setmTotal_Size(size); // 设置总大小
+                    }
 
 					if (DIR_ERROR_MKFAIL.equals(dirResult)) {
 						dwnstatus = DwnStatus.STATUS_FAIL_MKDIR_FAIL;		// 文件创建失败
@@ -289,9 +294,18 @@ public class AbsDownloader implements Dwnloader{
 				}
 			}
 		}
-		
+
 		if (dwnstatus == DwnStatus.STATUS_SUCCESS && !TextUtils.isEmpty(mDwnInfo.getmMd5())) {
 			// check md5
+            long t1 = System.currentTimeMillis();
+
+            String md5 = DwnMd5.getMD5(new File(mDwnInfo.getmSavePath()));
+            if(!TextUtils.isEmpty(md5) && !md5.equals(mDwnInfo.getmMd5())) {
+                synchronized (DwnManager.class) {
+                    dwnstatus = DwnStatus.STATUS_FAIL_MD5_CHECK_FAIL;
+                }
+            }
+            Log.d("caojianbo", "url  " +  uri + "  md5 " + md5 + "   time " + (System.currentTimeMillis() - t1) );
 		}
 		
 		
