@@ -173,7 +173,7 @@ public class AbsDownloader implements Dwnloader{
 				};
 				t.start();
 				try {
-					t.join(10);
+					t.join(30 * 1000);
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -307,8 +307,7 @@ public class AbsDownloader implements Dwnloader{
             }
             Log.d("caojianbo", "url  " +  uri + "  md5 " + md5 + "   time " + (System.currentTimeMillis() - t1) );
 		}
-		
-		
+
 		// 时间统计
 		
 		switch (dwnstatus) {

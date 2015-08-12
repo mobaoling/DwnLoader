@@ -325,7 +325,12 @@ public class DwnManager {
 			}
 			
 		}
-		
+
+        if (!retBool) {
+            System.out.print("");
+        }
+
+
 			Log.d("caojianbo", "return "  +" time  " + (System.currentTimeMillis() - t1));
 		return retBool;
 	}
