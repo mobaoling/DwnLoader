@@ -1,5 +1,13 @@
 package com.sf.dwnload;
 
+import android.os.StatFs;
+import android.os.SystemClock;
+import android.text.TextUtils;
+
+import com.sf.DwnMd5;
+import com.sf.dwnload.DwnManager.IDwnCallback;
+import com.sf.dwnload.dwninfo.BaseDwnInfo;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -14,17 +22,9 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
-
-import android.os.AsyncTask;
-import android.os.StatFs;
-import android.os.SystemClock;
-import android.text.TextUtils;
-import android.util.Log;
-
-import com.sf.DwnMd5;
-import com.sf.dwnload.DwnManager.IDwnCallback;
-import com.sf.dwnload.dwninfo.BaseDwnInfo;
 
 
 public class AbsDownloader implements Dwnloader{
@@ -44,6 +44,8 @@ public class AbsDownloader implements Dwnloader{
 	private IDwnCallback mCallback;
 	
 	private HttpURLConnection mConnection;
+
+    private InputStream mIs;
 	
 	private Thread mThread;
 	
@@ -53,6 +55,8 @@ public class AbsDownloader implements Dwnloader{
 
 	public static final String DIR_ERROR_NOT_ENOUGH = "dir_error_not_enough";
 
+    public static Executor mFixThreads;
+
 
 	public AbsDownloader(BaseDwnInfo dwnInfo, int mode, IDwnCallback callback, DwnOption option,  String...  dirs) {
 		mMode = mode;
@@ -60,19 +64,41 @@ public class AbsDownloader implements Dwnloader{
 		this.mDirs = dirs;
 		this.mCallback = callback;
 		this.mDwnOption = option;
+
+        if (null == mFixThreads) {
+            mFixThreads = Executors.newCachedThreadPool();
+        }
 	}
 	
 	public void disconnect() {
 		if (null != mConnection) {
 			try {
 				if (null != mThread) {
-					Log.d("caojianbo", "interrupt");
 					mThread.interrupt();
 				}
-				mConnection.disconnect();
-				
-				mManualDisconnect = true;
-				Log.d("caojianbo", "disconnect");
+
+                mFixThreads.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        synchronized (AbsDownloader.class) {
+                            try {
+                                if (null != mIs) {
+                                    mIs.close();
+                                }
+
+                                if (null != mConnection) {
+                                    mConnection.disconnect();
+                                }
+
+                            } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    }
+                });
+                synchronized (DwnManager.class) {
+                    mManualDisconnect = true;
+                }
 			} catch (Exception e) {
 			}
 		}
@@ -90,6 +116,10 @@ public class AbsDownloader implements Dwnloader{
 		public int mReadOutTime;
 
 		public String mSubfix;
+        /**
+         * 自定义请求头
+         */
+        public HashMap<String, String> mRequestHeaders;
 	}
 
 	@Override
@@ -110,7 +140,7 @@ public class AbsDownloader implements Dwnloader{
 			e.printStackTrace();
 		}
 		
-		if (null == uri) {
+		if (null == url) {
 			dwnstatus = DwnStatus.STATUS_FAIL_URL_ERROR;  													// uri 格式错误d
 		} else {
 			mConnection = null;
@@ -149,8 +179,9 @@ public class AbsDownloader implements Dwnloader{
 				} catch (ProtocolException e) {
 					e.printStackTrace();
 				}
-				
-				// 继续下载
+
+
+                // 继续下载
 				if (mMode == MODE_CONTINUE) {
 					mConnection.addRequestProperty("Range", "bytes=" + mDwnInfo.getmCurrent_Size() + "-");
 				}
@@ -181,17 +212,13 @@ public class AbsDownloader implements Dwnloader{
 				dwnstatus = t.getDwnStatus();
 				responseCode = t.getResponseCode();
 				
-				Log.d("caojianbo", " get responsecode over " + responseCode);
-				
 				// 暂停
 				synchronized (DwnManager.class) {
 					if (mManualDisconnect && mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE) {
 						dwnstatus = DwnStatus.STATUS_PAUSE;
 					}
 				}
-				
-				Log.d("caojianbo", "response code " + responseCode);
-				
+
 				if (dwnstatus == DwnStatus.STATUS_PAUSE) {
 					
 				} else if (dwnstatus == DwnStatus.STATUS_FAIL_CONNECT_TIME_OUTL) {
@@ -219,11 +246,11 @@ public class AbsDownloader implements Dwnloader{
 							e.printStackTrace();
 						}
 						mDwnInfo.setmSavePath(dirResult);
-						InputStream is = null;
+                        mIs = null;
 						try {
 							int count = 0;
 							int current = 0;
-							is = mConnection.getInputStream();
+                            mIs = mConnection.getInputStream();
 
 							if (mMode == MODE_CONTINUE) {
 								current = (int)mDwnInfo.getmCurrent_Size();
@@ -231,7 +258,7 @@ public class AbsDownloader implements Dwnloader{
 							}
 
 							byte[] tmp = new byte[1024 * 100];
-							while ((count = is.read(tmp)) > 0) {
+							while ((count = mIs.read(tmp)) > 0) {
 								raf.write(tmp, 0, count);
 								current += count;
 								mDwnInfo.setmCurrent_Size(current);
@@ -244,13 +271,10 @@ public class AbsDownloader implements Dwnloader{
 							dwnstatus = DwnStatus.STATUS_FAIL_READ_TIME_OUTL;
 						} catch (Exception e) {
 							e.printStackTrace();
-						}
+                            if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE && mManualDisconnect) {
 
-						if (null != is) {
-							try {
-								is.close();
-							} catch (Exception e) {
-							}
+                                dwnstatus = DwnStatus.STATUS_PAUSE;
+                            }
 						}
 
 						// 关闭文件
@@ -260,6 +284,26 @@ public class AbsDownloader implements Dwnloader{
 							} catch (Exception e) {
 							}
 						}
+
+                        mFixThreads.execute(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    if (null != mIs) {
+                                        mIs.close();                        // 耗时操作
+                                    }
+
+                                    if (null != mConnection) {
+                                        try {
+                                            mConnection.disconnect();       // 耗时操作
+                                        } catch (Exception e) {
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    e.printStackTrace();;
+                                }
+                            }
+                        });
 
 						synchronized (DwnManager.class) {
 							if (mManualDisconnect) {
@@ -285,13 +329,6 @@ public class AbsDownloader implements Dwnloader{
 				} else  {
 					dwnstatus = DwnStatus.STATUS_FAIL_CONNECT_ERROR;
 				}
-				
-				if (null != mConnection) {
-					try {
-						mConnection.disconnect();
-					} catch (Exception e) {
-					}
-				}
 			}
 		}
 
@@ -305,7 +342,6 @@ public class AbsDownloader implements Dwnloader{
                     dwnstatus = DwnStatus.STATUS_FAIL_MD5_CHECK_FAIL;
                 }
             }
-            Log.d("caojianbo", "url  " +  uri + "  md5 " + md5 + "   time " + (System.currentTimeMillis() - t1) );
 		}
 
 		// 时间统计
@@ -319,13 +355,11 @@ public class AbsDownloader implements Dwnloader{
 		default:
 			break;
 		}
-
 		synchronized (DwnManager.class) {
 			if (null != mCallback) {
 				mCallback.onDwnStatusChange(uri, dwnstatus);   					// 
 			}
 		}
-		
 		return dwnstatus;
 	}
 
@@ -432,6 +466,11 @@ public class AbsDownloader implements Dwnloader{
 
 	@Override
 	public HashMap<String, String> withHeaderParameter() {
+
+        if (null != mDwnOption) {
+            return mDwnOption.mRequestHeaders;
+        }
+
 		return null;
 	}
 	

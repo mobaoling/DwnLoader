@@ -88,7 +88,24 @@ public class DwnManager {
 			BaseDwnInfo info = mDwnList.get(uri);
 			info.setmDwnStatus(dwnResult);
 			mDBHelper.updateBaseDwnInfo(info);
+
+            // 清空 future
+            int status = DwnStatus.convert_Status(dwnResult);
+            switch (status){
+                case DwnStatus.STATUS_NONE:
+                case DwnStatus.STATUS_FAIL:
+                case DwnStatus.STATUS_SUCCESS:
+                case DwnStatus.STATUS_PAUSE:
+                    synchronized (DwnManager.class) {
+                        mFutureList.remove(uri);
+                        mTaskList.remove(uri);
+                    }
+                    break;
+            }
+
+
 			mContextHandler.notifyStatusChange(uri, dwnResult);
+
 			return true;
 		}
 	};
@@ -282,9 +299,12 @@ public class DwnManager {
 			// task 还未被执行
             if (null == future) {
                 synchronized (DwnManager.class) {
-                    dwnInfo.setmDwnStatus(DwnStatus.STATUS_PAUSE);
-                    // 更新
-                    mDBHelper.updateBaseDwnInfo(dwnInfo);
+                    if(null != dwnInfo) {
+                        dwnInfo.setmDwnStatus(DwnStatus.STATUS_PAUSE);
+                        // 更新
+                        mDBHelper.updateBaseDwnInfo(dwnInfo);
+
+                    }
                     retBool  = true;
                 }
             } else if (mExecutor.getQueue().contains(future)) {
