@@ -405,6 +405,7 @@ public class AbsDownloader implements Dwnloader{
 					}
 
 					if (null != mDwnOption) {
+                        path = path.replace(".", "_");
 						path += mDwnOption.mSubfix;
 					}
 
