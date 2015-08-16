@@ -3,11 +3,13 @@ package com.sf.dwnload;
 import android.os.StatFs;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Log;
 
 import com.sf.DwnMd5;
 import com.sf.dwnload.DwnManager.IDwnCallback;
 import com.sf.dwnload.dwninfo.BaseDwnInfo;
 
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -22,8 +24,12 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -48,6 +54,10 @@ public class AbsDownloader implements Dwnloader{
     private InputStream mIs;
 	
 	private Thread mThread;
+
+    private Thread mReadDataThread;
+
+    RandomAccessFile mRaf = null;
 	
 	private boolean mManualDisconnect = false;
 
@@ -55,7 +65,7 @@ public class AbsDownloader implements Dwnloader{
 
 	public static final String DIR_ERROR_NOT_ENOUGH = "dir_error_not_enough";
 
-    public static Executor mFixThreads;
+    public static ExecutorService mFixThreads;
 
 
 	public AbsDownloader(BaseDwnInfo dwnInfo, int mode, IDwnCallback callback, DwnOption option,  String...  dirs) {
@@ -74,8 +84,20 @@ public class AbsDownloader implements Dwnloader{
 		if (null != mConnection) {
 			try {
 				if (null != mThread) {
-					mThread.interrupt();
+                    try {
+                        mThread.interrupt();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
 				}
+
+                if (null != mReadDataThread) {
+                    try {
+                        mReadDataThread.interrupt();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
 
                 mFixThreads.execute(new Runnable() {
                     @Override
@@ -238,91 +260,82 @@ public class AbsDownloader implements Dwnloader{
 						dwnstatus = DwnStatus.STATUS_FAIL_SPACE_NOT_ENO;
 					} else  {
 
-						boolean connectSuccess = false;// 是否连接成功
-						RandomAccessFile raf = null;
 						try {
-							raf = new RandomAccessFile(new File(dirResult), "rws");
+							mRaf = new RandomAccessFile(new File(dirResult), "rws");
 						} catch (FileNotFoundException e) {
 							e.printStackTrace();
 						}
 						mDwnInfo.setmSavePath(dirResult);
-                        mIs = null;
-						try {
-							int count = 0;
-							int current = 0;
-                            mIs = mConnection.getInputStream();
 
-							if (mMode == MODE_CONTINUE) {
-								current = (int)mDwnInfo.getmCurrent_Size();
-								raf.seek(mDwnInfo.getmCurrent_Size());
-							}
 
-							byte[] tmp = new byte[1024 * 100];
-							while ((count = mIs.read(tmp)) > 0) {
-								raf.write(tmp, 0, count);
-								current += count;
-								mDwnInfo.setmCurrent_Size(current);
-								if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE) {
-									break;
-								}
-							}
-							connectSuccess = true;
-						} catch (SocketTimeoutException e) {
-							dwnstatus = DwnStatus.STATUS_FAIL_READ_TIME_OUTL;
-						} catch (Exception e) {
-							e.printStackTrace();
-                            if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE && mManualDisconnect) {
+                        Future<Integer> future = mFixThreads.submit(new Callable<Integer>() {
+                            @Override
+                            public Integer call() throws Exception {
 
-                                dwnstatus = DwnStatus.STATUS_PAUSE;
+                                mReadDataThread = Thread.currentThread();
+
+                                int ret = DwnStatus.STATUS_NONE;        // 初始状态
+
+                                try {
+                                    int count = 0;
+                                    int current = 0;
+
+                                    mIs = mConnection.getInputStream();
+
+                                    if (mMode == MODE_CONTINUE) {
+                                        current = (int) mDwnInfo.getmCurrent_Size();
+                                        mRaf.seek(mDwnInfo.getmCurrent_Size());
+                                    }
+
+                                    byte[] tmp = new byte[1024 * 100];
+                                    while ((count = mIs.read(tmp)) > 0) {
+                                        mRaf.write(tmp, 0, count);
+                                        current += count;
+                                        mDwnInfo.setmCurrent_Size(current);
+                                        if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE
+                                                || mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_PAUSE) {
+
+                                            break;
+                                        }
+                                    }
+                                    ret = DwnStatus.STATUS_SUCCESS;
+                                } catch (SocketTimeoutException e) {
+                                    ret = DwnStatus.STATUS_FAIL_READ_TIME_OUTL;
+                                    e.printStackTrace();
+                                } catch (Exception e) {
+                                    ret = DwnStatus.STATUS_FAIL_READ_FILE;
+                                    e.printStackTrace();
+                                }
+
+                                return ret;
                             }
-						}
+                        });
 
-						// 关闭文件
-						if (null != raf) {
+                        int ret = dwnstatus;
+                        try {
+                            ret = future.get();   // 获取读取结果
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
+
+                        if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE && mManualDisconnect) {
+                            dwnstatus = DwnStatus.STATUS_PAUSE;
+
+                        }
+
+                        // 关闭文件
+						if (null != mRaf) {
 							try {
-								raf.close();
+                                mRaf.close();
 							} catch (Exception e) {
 							}
 						}
 
-                        mFixThreads.execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    if (null != mIs) {
-                                        mIs.close();                        // 耗时操作
-                                    }
+                        if (dwnstatus == DwnStatus.STATUS_PAUSE) {
 
-                                    if (null != mConnection) {
-                                        try {
-                                            mConnection.disconnect();       // 耗时操作
-                                        } catch (Exception e) {
-                                        }
-                                    }
-                                } catch (Exception e) {
-                                    e.printStackTrace();;
-                                }
-                            }
-                        });
-
-						synchronized (DwnManager.class) {
-							if (mManualDisconnect) {
-								connectSuccess = true;   // 手动断连，判断为连接成功
-							}
-						}
-
-						if (dwnstatus == DwnStatus.STATUS_FAIL_READ_TIME_OUTL) {
-
-						} else if (connectSuccess) {
-							if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE) {
-								dwnstatus = DwnStatus.STATUS_PAUSE;									// 暂停
-							} else {
-								dwnstatus  = DwnStatus.STATUS_SUCCESS;								// 连接成功
-							}
-						} else {
-							dwnstatus = DwnStatus.STATUS_FAIL_READ_FILE;							// 读取失败
-						}
-					}
+                        } else {
+                            dwnstatus = ret;
+                        }
 
 				} else if (responseCode != -1) {
 					dwnstatus =  (responseCode << 16 ) & DwnStatus.STATUS_FAIL_ERROR_CODE ;  											// 请求错误
@@ -332,7 +345,27 @@ public class AbsDownloader implements Dwnloader{
 			}
 		}
 
-		if (dwnstatus == DwnStatus.STATUS_SUCCESS && !TextUtils.isEmpty(mDwnInfo.getmMd5())) {
+        mFixThreads.execute(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    if (null != mIs) {
+                        mIs.close();                        // 耗时操作
+                    }
+
+                    if (null != mConnection) {
+                        try {
+                            mConnection.disconnect();       // 耗时操作
+                        } catch (Exception e) {
+                        }
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();;
+                }
+            }
+        });
+
+        if (dwnstatus == DwnStatus.STATUS_SUCCESS && !TextUtils.isEmpty(mDwnInfo.getmMd5())) {
 			// check md5
             long t1 = System.currentTimeMillis();
 
