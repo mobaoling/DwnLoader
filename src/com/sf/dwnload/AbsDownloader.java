@@ -336,6 +336,7 @@ public class AbsDownloader implements Dwnloader{
                         } else {
                             dwnstatus = ret;
                         }
+					}
 
 				} else if (responseCode != -1) {
 					dwnstatus =  (responseCode << 16 ) & DwnStatus.STATUS_FAIL_ERROR_CODE ;  											// 请求错误
