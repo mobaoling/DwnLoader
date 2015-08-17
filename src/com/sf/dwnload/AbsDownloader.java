@@ -138,6 +138,9 @@ public class AbsDownloader implements Dwnloader{
 		public int mReadOutTime;
 
 		public String mSubfix;
+
+        public boolean mStopOthers;
+
         /**
          * 自定义请求头
          */
@@ -262,10 +265,13 @@ public class AbsDownloader implements Dwnloader{
 
 						try {
 							mRaf = new RandomAccessFile(new File(dirResult), "rws");
+                            mRaf.setLength(size);
 						} catch (FileNotFoundException e) {
 							e.printStackTrace();
-						}
-						mDwnInfo.setmSavePath(dirResult);
+						} catch (IOException e) {
+                            e.printStackTrace();
+                        }
+                        mDwnInfo.setmSavePath(dirResult);
 
 
                         Future<Integer> future = mFixThreads.submit(new Callable<Integer>() {
