@@ -69,5 +69,22 @@ public interface Dwnloader extends Callable<Integer> {
 			}
 			return status;
 		}
+
+        /**
+         * 转转errorcode，当响应头错误的时候
+         * @param status
+         * @return
+         */
+        public static int convert_ErrorCodeStatus(int status) {
+
+            int convert = status & 0x0000ffff;
+            switch (convert) {
+                case STATUS_FAIL_ERROR_CODE:
+                    return ((status & 0xffff0000) >> 16);
+                default:
+                    break;
+            }
+            return status;
+        }
 	}
 }

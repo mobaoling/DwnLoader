@@ -3,3 +3,6 @@ build/
 .classpath
 gen/
 proguard-project.txt
+.gradle/
+.idea/
+.settings/
