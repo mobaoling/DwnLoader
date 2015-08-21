@@ -13,14 +13,16 @@ public class DwnHelper extends SQLiteOpenHelper {
 	
 	private static final int DB_VERSION = 1;
 	
-	private static final String DB_NAME = "dwn_db.db"; 
-	
-	private File_DAO mFile_Dao;
+	private static final String DB_NAME = "dwn_db.db";
+
+    private static final String DB_ID_NAME = "dwn_db";
+
+    private File_DAO mFile_Dao;
 	
 	private APK_DAO mApk_Dao;
 
-	public DwnHelper(Context context) {
-		super(context, DB_NAME, null, DB_VERSION);
+	public DwnHelper(Context context, int ID) {
+		super(context, ID == 0 ? DB_NAME : DB_ID_NAME + "_" + ID  + ".db", null, DB_VERSION);
 		
 		mFile_Dao = new File_DAO();
 		mApk_Dao = new APK_DAO();
@@ -70,11 +72,6 @@ public class DwnHelper extends SQLiteOpenHelper {
 		 return mApk_Dao.getDwnInfo(getReadableDatabase(), uri);
 	}
 	
-	/**
-	 * 
-	 * @param uri
-	 * @return
-	 */
 	public List<APKDwnInfo> getApkInfoList() {
 		 return mApk_Dao.getDwnInfoList(getReadableDatabase());
 	}

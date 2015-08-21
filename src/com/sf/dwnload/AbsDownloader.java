@@ -30,6 +30,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -59,13 +60,13 @@ public class AbsDownloader implements Dwnloader{
 
     RandomAccessFile mRaf = null;
 	
-	private boolean mManualDisconnect = false;
+	private AtomicBoolean mManualDisconnect = new AtomicBoolean(false);
 
 	public static final String DIR_ERROR_MKFAIL = "dir_error_mkfailed";
 
 	public static final String DIR_ERROR_NOT_ENOUGH = "dir_error_not_enough";
 
-    public static ExecutorService mFixThreads;
+    public ExecutorService mFixThreads;
 
 
 	public AbsDownloader(BaseDwnInfo dwnInfo, int mode, IDwnCallback callback, DwnOption option,  String...  dirs) {
@@ -119,7 +120,7 @@ public class AbsDownloader implements Dwnloader{
                     }
                 });
                 synchronized (DwnManager.class) {
-                    mManualDisconnect = true;
+                    mManualDisconnect.set(true);
                 }
 			} catch (Exception e) {
 			}
@@ -153,10 +154,7 @@ public class AbsDownloader implements Dwnloader{
 		long beginTime = SystemClock.uptimeMillis();
 		
 		String uri = mDwnInfo.getmUri();
-		synchronized (DwnManager.class) {
-			mThread = Thread.currentThread();
-		}
-		
+
 		URL url = null;
 		int dwnstatus = DwnStatus.STATUS_NONE;
 		try {
@@ -216,13 +214,18 @@ public class AbsDownloader implements Dwnloader{
 				ResThread t = new ResThread(){
 					
 					public void run() {
+
+                        synchronized (DwnManager.class) {
+                            mThread = Thread.currentThread();
+                        }
+
 						try {
 							int res = mConnection.getResponseCode();
 							setResponseCode(res);
 						} catch (SocketTimeoutException e) {
 							setDwnStatus(DwnStatus.STATUS_FAIL_CONNECT_TIME_OUTL);
 							e.printStackTrace();
-						} catch (IOException e) {
+						} catch (Throwable e) {
 							setDwnStatus(DwnStatus.STATUS_FAIL_CONNECT_ERROR);
 						}
 					};
@@ -239,7 +242,7 @@ public class AbsDownloader implements Dwnloader{
 				
 				// 暂停
 				synchronized (DwnManager.class) {
-					if (mManualDisconnect && mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE) {
+					if (mManualDisconnect.get() && mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE) {
 						dwnstatus = DwnStatus.STATUS_PAUSE;
 					}
 				}
@@ -309,6 +312,7 @@ public class AbsDownloader implements Dwnloader{
                                     ret = DwnStatus.STATUS_FAIL_READ_TIME_OUTL;
                                     e.printStackTrace();
                                 } catch (Exception e) {
+
                                     ret = DwnStatus.STATUS_FAIL_READ_FILE;
                                     e.printStackTrace();
                                 }
@@ -318,17 +322,16 @@ public class AbsDownloader implements Dwnloader{
                         });
 
                         int ret = dwnstatus;
+
                         try {
                             ret = future.get();   // 获取读取结果
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
-
-                        if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE && mManualDisconnect) {
+                        if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE || mManualDisconnect.get()) {
                             dwnstatus = DwnStatus.STATUS_PAUSE;
 
                         }
-
                         // 关闭文件
 						if (null != mRaf) {
 							try {
@@ -397,7 +400,7 @@ public class AbsDownloader implements Dwnloader{
 		}
 		synchronized (DwnManager.class) {
 			if (null != mCallback) {
-				mCallback.onDwnStatusChange(uri, dwnstatus);   					// 
+				mCallback.onDwnStatusChange(uri, dwnstatus);   					//
 			}
 		}
 		return dwnstatus;
