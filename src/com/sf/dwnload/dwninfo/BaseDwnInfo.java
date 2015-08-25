@@ -63,11 +63,16 @@ public class BaseDwnInfo implements Parcelable {
 	}
 
 	public long getmCurrent_Size() {
-		return mCurrent_Size;
+        synchronized (this) {
+            return mCurrent_Size;
+        }
 	}
 
 	public void setmCurrent_Size(long mCurrent_Size) {
-		this.mCurrent_Size = mCurrent_Size;
+        synchronized (this) {
+            this.mCurrent_Size = mCurrent_Size;
+        }
+
 	}
 
 	public String getmMd5() {

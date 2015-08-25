@@ -56,7 +56,7 @@ public class AbsDownloader implements Dwnloader{
 	
 	private Thread mThread;
 
-    private Thread mReadDataThread;
+    private Future<Integer> mFuture;
 
     RandomAccessFile mRaf = null;
 	
@@ -82,48 +82,45 @@ public class AbsDownloader implements Dwnloader{
 	}
 	
 	public void disconnect() {
+
+        mManualDisconnect.set(true);
+
+        if (null != mThread) {
+            try {
+                mThread.interrupt();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
+        if (null != mFuture) {
+            try {
+                mFuture.cancel(true);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+
 		if (null != mConnection) {
-			try {
-				if (null != mThread) {
-                    try {
-                        mThread.interrupt();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-				}
-
-                if (null != mReadDataThread) {
-                    try {
-                        mReadDataThread.interrupt();
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                mFixThreads.execute(new Runnable() {
-                    @Override
-                    public void run() {
-                        synchronized (AbsDownloader.class) {
-                            try {
-                                if (null != mIs) {
-                                    mIs.close();
-                                }
-
-                                if (null != mConnection) {
-                                    mConnection.disconnect();
-                                }
-
-                            } catch (Exception e) {
-                                e.printStackTrace();
+            mFixThreads.execute(new Runnable() {
+                @Override
+                public void run() {
+                    synchronized (AbsDownloader.class) {
+                        try {
+                            if (null != mIs) {
+                                mIs.close();
                             }
+
+                            if (null != mConnection) {
+                                mConnection.disconnect();
+                            }
+
+                        } catch (Exception e) {
+                            e.printStackTrace();
                         }
                     }
-                });
-                synchronized (DwnManager.class) {
-                    mManualDisconnect.set(true);
                 }
-			} catch (Exception e) {
-			}
+            });
 		}
 	}
 	
@@ -203,11 +200,14 @@ public class AbsDownloader implements Dwnloader{
 					e.printStackTrace();
 				}
 
+                long point = 0l;
 
                 // 继续下载
 				if (mMode == MODE_CONTINUE) {
-					mConnection.addRequestProperty("Range", "bytes=" + mDwnInfo.getmCurrent_Size() + "-");
+                    point = mDwnInfo.getmCurrent_Size();
+					mConnection.addRequestProperty("Range", "bytes=" + point + "-");
 				}
+                final long insertPoint = point;
 				
 				addHeaders(mConnection);  // 添加请求头参数
 				int responseCode = -1;
@@ -277,11 +277,10 @@ public class AbsDownloader implements Dwnloader{
                         mDwnInfo.setmSavePath(dirResult);
 
 
-                        Future<Integer> future = mFixThreads.submit(new Callable<Integer>() {
+                       mFuture = mFixThreads.submit(new Callable<Integer>() {
                             @Override
                             public Integer call() throws Exception {
 
-                                mReadDataThread = Thread.currentThread();
 
                                 int ret = DwnStatus.STATUS_NONE;        // 初始状态
 
@@ -292,19 +291,21 @@ public class AbsDownloader implements Dwnloader{
                                     mIs = mConnection.getInputStream();
 
                                     if (mMode == MODE_CONTINUE) {
-                                        current = (int) mDwnInfo.getmCurrent_Size();
-                                        mRaf.seek(mDwnInfo.getmCurrent_Size());
+                                        current = (int) insertPoint;
+                                        mRaf.seek(insertPoint);
                                     }
 
                                     byte[] tmp = new byte[1024 * 100];
                                     while ((count = mIs.read(tmp)) > 0) {
                                         mRaf.write(tmp, 0, count);
-                                        current += count;
-                                        mDwnInfo.setmCurrent_Size(current);
-                                        if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE
-                                                || mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_PAUSE) {
+                                        if ((mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE)
+                                                || (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_PAUSE)
+                                                || (mFuture.isCancelled()) || mManualDisconnect.get()) {
 
                                             break;
+                                        } else {
+                                            current += count;
+                                            mDwnInfo.setmCurrent_Size(current);
                                         }
                                     }
                                     ret = DwnStatus.STATUS_SUCCESS;
@@ -324,7 +325,7 @@ public class AbsDownloader implements Dwnloader{
                         int ret = dwnstatus;
 
                         try {
-                            ret = future.get();   // 获取读取结果
+                            ret = mFuture.get();   // 获取读取结果
                         } catch (Exception e) {
                             e.printStackTrace();
                         }
