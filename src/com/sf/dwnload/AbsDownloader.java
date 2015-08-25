@@ -66,7 +66,7 @@ public class AbsDownloader implements Dwnloader{
 
 	public static final String DIR_ERROR_NOT_ENOUGH = "dir_error_not_enough";
 
-    public ExecutorService mFixThreads;
+    public static ExecutorService mFixThreads;
 
 
 	public AbsDownloader(BaseDwnInfo dwnInfo, int mode, IDwnCallback callback, DwnOption option,  String...  dirs) {
@@ -80,6 +80,14 @@ public class AbsDownloader implements Dwnloader{
             mFixThreads = Executors.newCachedThreadPool();
         }
 	}
+
+    private synchronized  ExecutorService getThreadPool() {
+        if (null == mFixThreads) {
+            mFixThreads = Executors.newCachedThreadPool();
+        }
+
+        return mFixThreads;
+    }
 	
 	public void disconnect() {
 
@@ -100,28 +108,6 @@ public class AbsDownloader implements Dwnloader{
                 e.printStackTrace();
             }
         }
-
-		if (null != mConnection) {
-            mFixThreads.execute(new Runnable() {
-                @Override
-                public void run() {
-                    synchronized (AbsDownloader.class) {
-                        try {
-                            if (null != mIs) {
-                                mIs.close();
-                            }
-
-                            if (null != mConnection) {
-                                mConnection.disconnect();
-                            }
-
-                        } catch (Exception e) {
-                            e.printStackTrace();
-                        }
-                    }
-                }
-            });
-		}
 	}
 	
 	@Override
@@ -277,7 +263,7 @@ public class AbsDownloader implements Dwnloader{
                         mDwnInfo.setmSavePath(dirResult);
 
 
-                       mFuture = mFixThreads.submit(new Callable<Integer>() {
+                       mFuture = getThreadPool().submit(new Callable<Integer>() {
                             @Override
                             public Integer call() throws Exception {
 
