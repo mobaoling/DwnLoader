@@ -1,4 +1,4 @@
-#  DwmManager 说明 ![img](https://raw.githubusercontent.com/jerboy/DwnLoader/master/res/drawable-hdpi/ic_launcher.png)
+# ![img](https://raw.githubusercontent.com/jerboy/DwnLoader/master/res/drawable-hdpi/ic_launcher.png) DwmManager 说明 
 
 ##  下载类型
 + `APKDwnInfo`     apk 文件
