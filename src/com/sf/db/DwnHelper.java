@@ -1,13 +1,14 @@
 package com.sf.db;
 
-import java.util.List;
-
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import com.sf.dwnload.Dwnloader;
 import com.sf.dwnload.dwninfo.APKDwnInfo;
 import com.sf.dwnload.dwninfo.BaseDwnInfo;
+
+import java.util.List;
 
 public class DwnHelper extends SQLiteOpenHelper {
 	
@@ -51,7 +52,13 @@ public class DwnHelper extends SQLiteOpenHelper {
 	//**************************************************************************
 	
 	public int getDwnStatus(String uri) {
-		 return mFile_Dao.getDwnStatus(getReadableDatabase(), uri);
+        try {
+            return mFile_Dao.getDwnStatus(getReadableDatabase(), uri);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return Dwnloader.DwnStatus.STATUS_NONE;
 	}
 	
 	/**
@@ -60,7 +67,12 @@ public class DwnHelper extends SQLiteOpenHelper {
 	 * @return
 	 */
 	public BaseDwnInfo getDwnInfo(String uri) {
-		 return mFile_Dao.getDwnInfo(getReadableDatabase(), uri);
+        try {
+            return mFile_Dao.getDwnInfo(getReadableDatabase(), uri);
+        } catch (Exception e) {
+           e.printStackTrace();
+        }
+        return null;
 	}
 	
 	/**
@@ -69,15 +81,30 @@ public class DwnHelper extends SQLiteOpenHelper {
 	 * @return
 	 */
 	public APKDwnInfo getApkInfo(String uri) {
-		 return mApk_Dao.getDwnInfo(getReadableDatabase(), uri);
+        try {
+            return mApk_Dao.getDwnInfo(getReadableDatabase(), uri);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
 	}
 	
 	public List<APKDwnInfo> getApkInfoList() {
-		 return mApk_Dao.getDwnInfoList(getReadableDatabase());
+        try {
+            return mApk_Dao.getDwnInfoList(getReadableDatabase());
+        } catch (Exception e) {
+         e.printStackTrace();
+        }
+        return null;
+
 	}
 
     public void resetDB() {
-        mFile_Dao.resetDB(getWritableDatabase());
+        try {
+            mFile_Dao.resetDB(getWritableDatabase());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 	
 	/**
@@ -86,21 +113,31 @@ public class DwnHelper extends SQLiteOpenHelper {
 	 * @return
 	 */
 	public boolean insertBaseDwnInfo(BaseDwnInfo dwnInfo) {
-		return mFile_Dao.insert(getWritableDatabase(), dwnInfo);
+        try {
+            return mFile_Dao.insert(getWritableDatabase(), dwnInfo);
+        } catch (Exception e) {
+            return false;
+        }
 	}
 	
 	public boolean insertApkDwnInfo(APKDwnInfo apkInfo) {
 		
 		boolean ret = false;
-		getWritableDatabase().beginTransaction();
+
 		try {
+            getWritableDatabase().beginTransaction();
 			if (mApk_Dao.insert(getWritableDatabase(), apkInfo) && mFile_Dao.insert(getWritableDatabase(), apkInfo)) {
 				getWritableDatabase().setTransactionSuccessful();
 				ret = true;
 			};
 		} catch (Exception e) {
 		} finally {
-			getWritableDatabase().endTransaction();
+            try {
+                getWritableDatabase().endTransaction();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
 		}
 		
 		return ret;
@@ -109,22 +146,31 @@ public class DwnHelper extends SQLiteOpenHelper {
 	
 	public boolean deleteApkDwnInfo(String uri) {
 		boolean ret = false;
-		getWritableDatabase().beginTransaction();
+
 		try {
+            getWritableDatabase().beginTransaction();
 			mApk_Dao.delete(getWritableDatabase(), uri);
 			mFile_Dao.delete(getWritableDatabase(), uri);
 			getWritableDatabase().setTransactionSuccessful();
 				ret = true;
 		} catch (Exception e) {
 		} finally {
-			getWritableDatabase().endTransaction();
+            try {
+                getWritableDatabase().endTransaction();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 		}
 		
 		return ret;
 	}
 	
 	public boolean updateBaseDwnInfo(BaseDwnInfo dwnInfo) {
-		return mFile_Dao.update(getWritableDatabase(), dwnInfo);
+        try {
+            return mFile_Dao.update(getWritableDatabase(), dwnInfo);
+        } catch (Exception e) {
+            return false;
+        }
 	}
 	
 

@@ -3,13 +3,11 @@ package com.sf.dwnload;
 import android.os.StatFs;
 import android.os.SystemClock;
 import android.text.TextUtils;
-import android.util.Log;
 
 import com.sf.DwnMd5;
 import com.sf.dwnload.DwnManager.IDwnCallback;
 import com.sf.dwnload.dwninfo.BaseDwnInfo;
 
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -25,8 +23,6 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -281,8 +277,13 @@ public class AbsDownloader implements Dwnloader{
                                         mRaf.seek(insertPoint);
                                     }
 
-                                    byte[] tmp = new byte[1024 * 100];
+                                    byte[] tmp = new byte[1024 * 30];
                                     while ((count = mIs.read(tmp)) > 0) {
+
+                                        if (mManualDisconnect.get()) {
+                                           break;
+                                        }
+
                                         mRaf.write(tmp, 0, count);
                                         if ((mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE)
                                                 || (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_PAUSE)
