@@ -12,16 +12,6 @@ import java.security.NoSuchAlgorithmException;
  */
 public class DwnMd5 {
 
-    static MessageDigest MD5 = null;
-
-    static {
-        try {
-            MD5 = MessageDigest.getInstance("MD5");
-        } catch (NoSuchAlgorithmException ne) {
-            ne.printStackTrace();
-        }
-    }
-
     /**
      * 对一个文件获取md5值
      * @return md5串
@@ -29,6 +19,9 @@ public class DwnMd5 {
     public static String getMD5(File file) {
         FileInputStream fileInputStream = null;
         try {
+
+            MessageDigest MD5 = MessageDigest.getInstance("MD5");
+
             fileInputStream = new FileInputStream(file);
             byte[] buffer = new byte[8192];
             int length;
@@ -43,12 +36,17 @@ public class DwnMd5 {
                 hexChar[hexIndex++] = Integer.toHexString(((md5byte[i] >> 4) & 0x0f)).charAt(0);
                 hexChar[hexIndex++] = Integer.toHexString((md5byte[i] & 0x0f)).charAt(0);
             }
-
             return new String(hexChar);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
             return null;
-        } catch (IOException e) {
+        }   catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return null;
+        }  catch (IOException e) {
+            e.printStackTrace();
+            return null;
+        } catch (Throwable e) {
             e.printStackTrace();
             return null;
         } finally {

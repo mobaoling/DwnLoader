@@ -1,28 +1,26 @@
 package com.sf.dwnload;
 
+import android.content.Context;
+import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
+import android.text.TextUtils;
+
+import com.sf.db.DwnHelper;
+import com.sf.dwnload.Dwnloader.DwnStatus;
+import com.sf.dwnload.dwninfo.APKDwnInfo;
+import com.sf.dwnload.dwninfo.BaseDwnInfo;
+
 import java.io.File;
 import java.lang.ref.WeakReference;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
-
-import android.content.Context;
-import android.content.Intent;
-import android.os.Handler;
-import android.os.Looper;
-import android.text.TextUtils;
-import android.util.Log;
-
-import com.sf.db.DwnHelper;
-import com.sf.dwnload.Dwnloader.DwnStatus;
-import com.sf.dwnload.dwninfo.APKDwnInfo;
-import com.sf.dwnload.dwninfo.BaseDwnInfo;
 
 
 /**
@@ -84,11 +82,18 @@ public class DwnManager {
         mStatusWatchList = new ArrayList<IDwnCallback>();
 		
 		resetDB();
-		mExecutor = (ThreadPoolExecutor)Executors.newFixedThreadPool(2);
+
+		mExecutor = (ThreadPoolExecutor)Executors.newFixedThreadPool(2, new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                Thread t = new Thread(r);
+                t.setName("download_manager ");
+                return t;
+            }
+        });
 	}
 	
 	private void resetDB() {
-		
 		mDBHelper.resetDB();
 	}
 
