@@ -16,11 +16,11 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 
 /**
@@ -281,7 +281,6 @@ public class DwnManager {
 	 * @return int  <br/>开始下载 > 0 <br/> 下载失败  < 0
 	 */
 	public int continueDwnFile(final BaseDwnInfo dwnIfo, AbsDownloader.DwnOption option, String... dir) {
-		
 		synchronized (DwnManager.class) {
 			if (null != dwnIfo) {
 				// 判断状态
@@ -315,8 +314,7 @@ public class DwnManager {
 	 * @return
 	 */
 	public boolean pause(String uri) {
-		
-		boolean retBool = false;
+        boolean retBool = false;
 		long t1 = System.currentTimeMillis();
 		if (null != uri) {
 			
@@ -339,7 +337,6 @@ public class DwnManager {
                     retBool  = true;
                 }
             } else if (mExecutor.getQueue().contains(future)) {
-				
 				synchronized (DwnManager.class) {
 					future.cancel(true);
 					dwnInfo.setmDwnStatus(DwnStatus.STATUS_PAUSE);
@@ -358,15 +355,15 @@ public class DwnManager {
 					}
 					int ret = -1;						//TODO 初始值
 					try {
-						if (null != future) {
-							ret = future.get();
-						}
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					} catch (ExecutionException e) {
-						e.printStackTrace();
-					} catch (Exception e) {
-					}
+                        if (null != future) {
+                            ret = future.get(200, TimeUnit.MILLISECONDS);
+                        }
+                    } catch (Exception e) {
+                        ret = DwnStatus.STATUS_PAUSE;
+                        // 通知暂停
+                        mDwnCallback.onDwnStatusChange(uri, ret);
+                        e.printStackTrace();
+                    }
 					
 					retBool = ( ret == DwnStatus.STATUS_PAUSE);
 				}
