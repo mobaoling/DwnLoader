@@ -7,6 +7,7 @@ import android.text.TextUtils;
 import com.sf.DwnMd5;
 import com.sf.dwnload.DwnManager.IDwnCallback;
 import com.sf.dwnload.dwninfo.BaseDwnInfo;
+import com.sf.util.ThreadUtil;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -23,8 +24,6 @@ import java.util.Iterator;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -62,7 +61,6 @@ public class AbsDownloader implements Dwnloader{
 
 	public static final String DIR_ERROR_NOT_ENOUGH = "dir_error_not_enough";
 
-    public static ExecutorService mFixThreads;
 
 
 	public AbsDownloader(BaseDwnInfo dwnInfo, int mode, IDwnCallback callback, DwnOption option,  String...  dirs) {
@@ -72,19 +70,9 @@ public class AbsDownloader implements Dwnloader{
 		this.mCallback = callback;
 		this.mDwnOption = option;
 
-        if (null == mFixThreads) {
-            mFixThreads = Executors.newCachedThreadPool();
-        }
+
 	}
 
-    private synchronized  ExecutorService getThreadPool() {
-        if (null == mFixThreads) {
-            mFixThreads = Executors.newCachedThreadPool();
-        }
-
-        return mFixThreads;
-    }
-	
 	public void disconnect() {
 
         mManualDisconnect.set(true);
@@ -133,11 +121,25 @@ public class AbsDownloader implements Dwnloader{
 		long beginTime = SystemClock.uptimeMillis();
 		
 		String uri = mDwnInfo.getmUri();
+        String host = "";
+        try {
+            host = new URL(uri).getAuthority();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
+        String dwnUri = DominParser.parseHost(uri);
+        boolean useHTTPDNS = false;
+        if (null != dwnUri) {
+            useHTTPDNS = true;
+        } else {
+            dwnUri = mDwnInfo.getmUri();
+            useHTTPDNS = false;
+        }
 		URL url = null;
 		int dwnstatus = DwnStatus.STATUS_NONE;
 		try {
-			url = new URL(uri);
+			url = new URL(dwnUri);
 		} catch (MalformedURLException e) {
 			e.printStackTrace();
 		}
@@ -178,6 +180,9 @@ public class AbsDownloader implements Dwnloader{
 				try {
 					mConnection.setRequestMethod("GET");
 					mConnection.addRequestProperty("Accept-Encoding", "identity");
+                    if (useHTTPDNS) {
+                        mConnection.addRequestProperty("HOST", host);
+                    }
 				} catch (ProtocolException e) {
 					e.printStackTrace();
 				}
@@ -193,6 +198,8 @@ public class AbsDownloader implements Dwnloader{
 				
 				addHeaders(mConnection);  // 添加请求头参数
 				int responseCode = -1;
+                final boolean finalhasUseHTTPDNS = useHTTPDNS;
+                final String finalhost  = host;
 				ResThread t = new ResThread(){
 					
 					public void run() {
@@ -205,6 +212,11 @@ public class AbsDownloader implements Dwnloader{
 							int res = mConnection.getResponseCode();
 							setResponseCode(res);
 						} catch (SocketTimeoutException e) {
+
+                            if (finalhasUseHTTPDNS) {
+                                DominParser.cleaHost(finalhost);
+                            }
+
 							setDwnStatus(DwnStatus.STATUS_FAIL_CONNECT_TIME_OUTL);
 							e.printStackTrace();
 						} catch (Throwable e) {
@@ -259,55 +271,55 @@ public class AbsDownloader implements Dwnloader{
                         mDwnInfo.setmSavePath(dirResult);
 
 
-                       mFuture = getThreadPool().submit(new Callable<Integer>() {
-                            @Override
-                            public Integer call() throws Exception {
+                       mFuture = ThreadUtil.getCachedThreadPool().submit(new Callable<Integer>() {
+                           @Override
+                           public Integer call() throws Exception {
 
 
-                                int ret = DwnStatus.STATUS_NONE;        // 初始状态
+                               int ret = DwnStatus.STATUS_NONE;        // 初始状态
 
-                                try {
-                                    int count = 0;
-                                    int current = 0;
+                               try {
+                                   int count = 0;
+                                   int current = 0;
 
-                                    mIs = mConnection.getInputStream();
+                                   mIs = mConnection.getInputStream();
 
-                                    if (mMode == MODE_CONTINUE) {
-                                        current = (int) insertPoint;
-                                        mRaf.seek(insertPoint);
-                                    }
+                                   if (mMode == MODE_CONTINUE) {
+                                       current = (int) insertPoint;
+                                       mRaf.seek(insertPoint);
+                                   }
 
-                                    byte[] tmp = new byte[1024 * 30];
-                                    while ((count = mIs.read(tmp)) > 0) {
+                                   byte[] tmp = new byte[1024 * 30];
+                                   while ((count = mIs.read(tmp)) > 0) {
 
-                                        if (mManualDisconnect.get()) {
+                                       if (mManualDisconnect.get()) {
                                            break;
-                                        }
+                                       }
 
-                                        mRaf.write(tmp, 0, count);
-                                        if ((mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE)
-                                                || (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_PAUSE)
-                                                || (mFuture.isCancelled()) || mManualDisconnect.get()) {
+                                       mRaf.write(tmp, 0, count);
+                                       if ((mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE)
+                                               || (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_PAUSE)
+                                               || (mFuture.isCancelled()) || mManualDisconnect.get()) {
 
-                                            break;
-                                        } else {
-                                            current += count;
-                                            mDwnInfo.setmCurrent_Size(current);
-                                        }
-                                    }
-                                    ret = DwnStatus.STATUS_SUCCESS;
-                                } catch (SocketTimeoutException e) {
-                                    ret = DwnStatus.STATUS_FAIL_READ_TIME_OUTL;
-                                    e.printStackTrace();
-                                } catch (Exception e) {
+                                           break;
+                                       } else {
+                                           current += count;
+                                           mDwnInfo.setmCurrent_Size(current);
+                                       }
+                                   }
+                                   ret = DwnStatus.STATUS_SUCCESS;
+                               } catch (SocketTimeoutException e) {
+                                   ret = DwnStatus.STATUS_FAIL_READ_TIME_OUTL;
+                                   e.printStackTrace();
+                               } catch (Exception e) {
 
-                                    ret = DwnStatus.STATUS_FAIL_READ_FILE;
-                                    e.printStackTrace();
-                                }
+                                   ret = DwnStatus.STATUS_FAIL_READ_FILE;
+                                   e.printStackTrace();
+                               }
 
-                                return ret;
-                            }
-                        });
+                               return ret;
+                           }
+                       });
 
                         int ret = dwnstatus;
 
@@ -343,7 +355,7 @@ public class AbsDownloader implements Dwnloader{
 			}
 		}
 
-        mFixThreads.execute(new Runnable() {
+        ThreadUtil.getCachedThreadPool().execute(new Runnable() {
             @Override
             public void run() {
                 try {
@@ -358,7 +370,8 @@ public class AbsDownloader implements Dwnloader{
                         }
                     }
                 } catch (Exception e) {
-                    e.printStackTrace();;
+                    e.printStackTrace();
+                    ;
                 }
             }
         });
