@@ -8,9 +8,6 @@ buildscript {
 }
 apply plugin: 'com.android.library'
 
-dependencies {
-    provided fileTree(dir: 'libs', include: '*.jar')
-}
 
 android {
     compileSdkVersion 14

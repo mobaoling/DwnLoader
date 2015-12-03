@@ -11,9 +11,9 @@ import com.sf.util.ThreadUtil;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.RandomAccessFile;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
@@ -53,15 +53,13 @@ public class AbsDownloader implements Dwnloader{
 
     private Future<Integer> mFuture;
 
-    RandomAccessFile mRaf = null;
+    FileOutputStream mFos = null;
 	
 	private AtomicBoolean mManualDisconnect = new AtomicBoolean(false);
 
 	public static final String DIR_ERROR_MKFAIL = "dir_error_mkfailed";
 
 	public static final String DIR_ERROR_NOT_ENOUGH = "dir_error_not_enough";
-
-
 
 	public AbsDownloader(BaseDwnInfo dwnInfo, int mode, IDwnCallback callback, DwnOption option,  String...  dirs) {
 		mMode = mode;
@@ -117,7 +115,6 @@ public class AbsDownloader implements Dwnloader{
 
 	@Override
 	public int dwnFile() {
-		
 		long beginTime = SystemClock.uptimeMillis();
 		
 		String uri = mDwnInfo.getmUri();
@@ -145,7 +142,7 @@ public class AbsDownloader implements Dwnloader{
 		}
 		
 		if (null == url) {
-			dwnstatus = DwnStatus.STATUS_FAIL_URL_ERROR;  													// uri 格式错误d
+    dwnstatus = DwnStatus.STATUS_FAIL_URL_ERROR;  													// uri 格式错误d
 		} else {
 			mConnection = null;
 			try {
@@ -164,7 +161,7 @@ public class AbsDownloader implements Dwnloader{
 			}
 			
 			if (null == mConnection) {
-				dwnstatus = DwnStatus.STATUS_FAIL_CONNECT_ERROR;													// 连接错误
+dwnstatus = DwnStatus.STATUS_FAIL_CONNECT_ERROR;													// 连接错误
 			} else {
 				
 				// 智能调节当前模式
@@ -191,7 +188,7 @@ public class AbsDownloader implements Dwnloader{
 
                 // 继续下载
 				if (mMode == MODE_CONTINUE) {
-                    point = mDwnInfo.getmCurrent_Size();
+                    point = new File(mDwnInfo.getmSavePath()).length();
 					mConnection.addRequestProperty("Range", "bytes=" + point + "-");
 				}
                 final long insertPoint = point;
@@ -259,60 +256,51 @@ public class AbsDownloader implements Dwnloader{
 					} else if (DIR_ERROR_NOT_ENOUGH.equals(dirResult)) {
 						dwnstatus = DwnStatus.STATUS_FAIL_SPACE_NOT_ENO;
 					} else  {
-
 						try {
-							mRaf = new RandomAccessFile(new File(dirResult), "rws");
-                            mRaf.setLength(size);
+                            mFos = new FileOutputStream(new File(dirResult), true);
 						} catch (FileNotFoundException e) {
 							e.printStackTrace();
 						} catch (IOException e) {
                             e.printStackTrace();
                         }
                         mDwnInfo.setmSavePath(dirResult);
-
-
                        mFuture = ThreadUtil.getCachedThreadPool().submit(new Callable<Integer>() {
                            @Override
                            public Integer call() throws Exception {
-
-
                                int ret = DwnStatus.STATUS_NONE;        // 初始状态
-
                                try {
                                    int count = 0;
                                    int current = 0;
-
                                    mIs = mConnection.getInputStream();
-
                                    if (mMode == MODE_CONTINUE) {
                                        current = (int) insertPoint;
-                                       mRaf.seek(insertPoint);
                                    }
 
                                    byte[] tmp = new byte[1024 * 30];
                                    while ((count = mIs.read(tmp)) > 0) {
-
                                        if (mManualDisconnect.get()) {
                                            break;
                                        }
 
-                                       mRaf.write(tmp, 0, count);
+                                       mFos.write(tmp, 0, count);
                                        if ((mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE)
                                                || (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_PAUSE)
-                                               || (mFuture.isCancelled()) || mManualDisconnect.get()) {
-
+                                               || (null != mFuture && mFuture.isCancelled()) || mManualDisconnect.get()) {
+                                           mManualDisconnect.set(true);// 手动暂定
                                            break;
                                        } else {
                                            current += count;
                                            mDwnInfo.setmCurrent_Size(current);
                                        }
                                    }
-                                   ret = DwnStatus.STATUS_SUCCESS;
+                                   if (!mManualDisconnect.get()){
+                                       ret = DwnStatus.STATUS_SUCCESS;
+                                   }
+
                                } catch (SocketTimeoutException e) {
                                    ret = DwnStatus.STATUS_FAIL_READ_TIME_OUTL;
                                    e.printStackTrace();
-                               } catch (Exception e) {
-
+                               } catch (final Exception e) {
                                    ret = DwnStatus.STATUS_FAIL_READ_FILE;
                                    e.printStackTrace();
                                }
@@ -322,7 +310,6 @@ public class AbsDownloader implements Dwnloader{
                        });
 
                         int ret = dwnstatus;
-
                         try {
                             ret = mFuture.get();   // 获取读取结果
                         } catch (Exception e) {
@@ -330,12 +317,11 @@ public class AbsDownloader implements Dwnloader{
                         }
                         if (mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE || mManualDisconnect.get()) {
                             dwnstatus = DwnStatus.STATUS_PAUSE;
-
                         }
                         // 关闭文件
-						if (null != mRaf) {
+						if (null != mFos) {
 							try {
-                                mRaf.close();
+                                mFos.close();
 							} catch (Exception e) {
 							}
 						}
