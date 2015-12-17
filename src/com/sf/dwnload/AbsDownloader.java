@@ -3,6 +3,7 @@ package com.sf.dwnload;
 import android.os.StatFs;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Base64;
 
 import com.sf.DwnMd5;
 import com.sf.dwnload.DwnManager.IDwnCallback;
@@ -67,12 +68,9 @@ public class AbsDownloader implements Dwnloader{
 		this.mDirs = dirs;
 		this.mCallback = callback;
 		this.mDwnOption = option;
-
-
 	}
 
 	public void disconnect() {
-
         mManualDisconnect.set(true);
 
         if (null != mThread) {
@@ -142,7 +140,7 @@ public class AbsDownloader implements Dwnloader{
 		}
 		
 		if (null == url) {
-    dwnstatus = DwnStatus.STATUS_FAIL_URL_ERROR;  													// uri 格式错误d
+            dwnstatus = DwnStatus.STATUS_FAIL_URL_ERROR;  													// uri 格式错误d
 		} else {
 			mConnection = null;
 			try {
@@ -161,9 +159,8 @@ public class AbsDownloader implements Dwnloader{
 			}
 			
 			if (null == mConnection) {
-dwnstatus = DwnStatus.STATUS_FAIL_CONNECT_ERROR;													// 连接错误
+                dwnstatus = DwnStatus.STATUS_FAIL_CONNECT_ERROR;													// 连接错误
 			} else {
-				
 				// 智能调节当前模式
 				if (mMode == MODE_CONTINUE) {
 					String file = mDwnInfo.getmSavePath();
@@ -185,7 +182,6 @@ dwnstatus = DwnStatus.STATUS_FAIL_CONNECT_ERROR;													// 连接错误
 				}
 
                 long point = 0l;
-
                 // 继续下载
 				if (mMode == MODE_CONTINUE) {
                     point = new File(mDwnInfo.getmSavePath()).length();
@@ -425,14 +421,7 @@ dwnstatus = DwnStatus.STATUS_FAIL_CONNECT_ERROR;													// 连接错误
 				if (dir_File.exists() && dir_File.isDirectory()) {
 
 					int firstIndex = uri.lastIndexOf("/") + 1;
-					int index2 = uri.indexOf("?");
-					String path = null;
-
-					if (index2 == -1) {
-						path = uri.substring(firstIndex);
-					} else {
-						path = uri.substring(firstIndex, index2);
-					}
+					String path  = Base64.encodeToString(uri.substring(firstIndex).getBytes(), Base64.NO_WRAP);
 
 					if (null != mDwnOption) {
                         path = path.replace(".", "_");
