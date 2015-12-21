@@ -3,7 +3,6 @@ package com.sf.dwnload;
 import android.os.StatFs;
 import android.os.SystemClock;
 import android.text.TextUtils;
-import android.util.Base64;
 
 import com.sf.DwnMd5;
 import com.sf.dwnload.DwnManager.IDwnCallback;
@@ -228,11 +227,9 @@ public class AbsDownloader implements Dwnloader{
 				responseCode = t.getResponseCode();
 				
 				// 暂停
-				synchronized (DwnManager.class) {
-					if (mManualDisconnect.get() && mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE) {
-						dwnstatus = DwnStatus.STATUS_PAUSE;
-					}
-				}
+                if (mManualDisconnect.get() || mDwnInfo.getmDwnStatus() == DwnStatus.STATUS_READY_PAUSE) {
+                    dwnstatus = DwnStatus.STATUS_PAUSE;
+                }
 
 				if (dwnstatus == DwnStatus.STATUS_PAUSE) {
 					
@@ -381,11 +378,9 @@ public class AbsDownloader implements Dwnloader{
 		default:
 			break;
 		}
-		synchronized (DwnManager.class) {
-			if (null != mCallback) {
-				mCallback.onDwnStatusChange(uri, dwnstatus);   					//
-			}
-		}
+        if (null != mCallback) {
+            mCallback.onDwnStatusChange(uri, dwnstatus);   					//
+        }
 		return dwnstatus;
 	}
 
@@ -421,7 +416,7 @@ public class AbsDownloader implements Dwnloader{
 				if (dir_File.exists() && dir_File.isDirectory()) {
 
 					int firstIndex = uri.lastIndexOf("/") + 1;
-					String path  = Base64.encodeToString(uri.substring(firstIndex).getBytes(), Base64.NO_WRAP);
+					String path  = DwnMd5.getMD5(uri.substring(firstIndex));
 
 					if (null != mDwnOption) {
                         path = path.replace(".", "_");

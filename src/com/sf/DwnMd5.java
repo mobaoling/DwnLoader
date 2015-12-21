@@ -59,5 +59,36 @@ public class DwnMd5 {
         }
     }
 
+    public static String getMD5(String  str) {
+        FileInputStream fileInputStream = null;
+        try {
+
+            MessageDigest MD5 = MessageDigest.getInstance("MD5");
+            byte [] tmp = str.getBytes();
+            MD5.update(tmp, 0, tmp.length);
+            byte [] md5byte = MD5.digest();
+            int byteCounts = md5byte.length;
+            char [] hexChar = new char[2 * byteCounts];
+            int hexIndex = 0;
+            for (int i = 0; i < byteCounts; i++) {
+                hexChar[hexIndex++] = Integer.toHexString(((md5byte[i] >> 4) & 0x0f)).charAt(0);
+                hexChar[hexIndex++] = Integer.toHexString((md5byte[i] & 0x0f)).charAt(0);
+            }
+            return new String(hexChar);
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            return null;
+        }  catch (Throwable e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            try {
+                if (fileInputStream != null)
+                    fileInputStream.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
 }
