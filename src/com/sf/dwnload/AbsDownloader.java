@@ -102,6 +102,8 @@ public class AbsDownloader implements Dwnloader{
 
 		public String mSubfix;
 
+        public String mSaveName;
+
         public boolean mStopOthers;
 
         /**
@@ -149,7 +151,7 @@ public class AbsDownloader implements Dwnloader{
 					mConnection.setReadTimeout(mDwnOption.mReadOutTime);
 				} else {
 					mConnection.setConnectTimeout(5000);
-					mConnection.setReadTimeout(5000);
+//					mConnection.setReadTimeout(5000);
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
@@ -368,7 +370,6 @@ public class AbsDownloader implements Dwnloader{
 		}
 
 		// 时间统计
-		
 		switch (dwnstatus) {
 		case DwnStatus.STATUS_SUCCESS:
 		case DwnStatus.STATUS_PAUSE:
@@ -416,12 +417,15 @@ public class AbsDownloader implements Dwnloader{
 				if (dir_File.exists() && dir_File.isDirectory()) {
 
 					int firstIndex = uri.lastIndexOf("/") + 1;
-					String path  = DwnMd5.getMD5(uri.substring(firstIndex));
-
-					if (null != mDwnOption) {
-                        path = path.replace(".", "_");
-						path += mDwnOption.mSubfix;
-					}
+                    String path = "";
+                    if (null != mDwnOption && !TextUtils.isEmpty(mDwnOption.mSaveName)) {
+                        path = mDwnOption.mSaveName;
+                    } else {
+                        path = DwnMd5.getMD5(uri.substring(firstIndex));
+                        if (null != mDwnOption) {
+                            path += mDwnOption.mSubfix;
+                        }
+                    }
 
 					finalPath = new File(dir_File, path);
 					if (finalPath.exists()) {

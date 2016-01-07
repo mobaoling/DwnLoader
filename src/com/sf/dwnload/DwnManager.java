@@ -244,12 +244,12 @@ public class DwnManager {
 				case DwnStatus.STATUS_NONE:
 				case DwnStatus.STATUS_FAIL:
 					boolean apksuccess = false;
-					
 					dwnIfo.setmCurrent_Size(0);
 					
 					// 插入基本信息
 					dwnIfo.setmDwnStatus(DwnStatus.STATUS_DOWNLOADING);
-					if (dwnIfo instanceof APKDwnInfo) {
+
+                    if (dwnIfo instanceof APKDwnInfo) {
 						// 插入版本号等信息
 						apksuccess = mDBHelper.insertApkDwnInfo((APKDwnInfo)dwnIfo);
 					} else {
@@ -262,6 +262,12 @@ public class DwnManager {
 						mDwnList.put(dwnIfo.getmUri(), dwnIfo);						// 修改状态
 						mFutureList.put(dwnIfo.getmUri(), ret);						// 结果列表
 						mTaskList.put(dwnIfo.getmUri(), task);
+
+                        try {
+                            mDwnCallback.onDwnStatusChange(dwnIfo.getmUri(), DwnStatus.STATUS_DOWNLOADING);
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
 					} else {
 						return -1000;
 					}
@@ -291,6 +297,11 @@ public class DwnManager {
 					// 插入基本信息
                     synchronized (DwnManager.class) {
                         dwnIfo.setmDwnStatus(DwnStatus.STATUS_DOWNLOADING);
+                    }
+                    try {
+                        mDwnCallback.onDwnStatusChange(dwnIfo.getmUri(), DwnStatus.STATUS_DOWNLOADING);
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
 					if (mDBHelper.updateBaseDwnInfo(dwnIfo)) {
 						AbsDownloader task = new AbsDownloader(dwnIfo, AbsDownloader.MODE_CONTINUE, mDwnCallback, option, dir);
@@ -429,27 +440,31 @@ public class DwnManager {
             mDwnManager = new WeakReference<DwnManager>(dm);
 		}
 		
-		public void notifyStatusChange(String uri, int status) {
-			Context context = mConReference.get();
-			if (null != context) {
-				
-				Intent intent = new Intent();
-				intent.setAction(ACTION_DWN_STATUS_CHANGE);
-				intent.putExtra(EXTRA_URI, uri);
-				intent.putExtra(EXTRA_STATUS, status);
-				context.sendBroadcast(intent);
-			}
+		public void notifyStatusChange(final String uri,final int status) {
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    Context context = mConReference.get();
+                    if (null != context) {
 
-            DwnManager dm = mDwnManager.get();
-            if (null != dm) {
-                ArrayList<IDwnCallback> callbacks = dm.getStatusCallback();
-                if (null != callbacks) {
-                    for (int i = 0; i < callbacks.size(); i++) {
-                        callbacks.get(i).onDwnStatusChange(uri, status);
+                        Intent intent = new Intent();
+                        intent.setAction(ACTION_DWN_STATUS_CHANGE);
+                        intent.putExtra(EXTRA_URI, uri);
+                        intent.putExtra(EXTRA_STATUS, status);
+                        context.sendBroadcast(intent);
+                    }
+
+                    DwnManager dm = mDwnManager.get();
+                    if (null != dm) {
+                        ArrayList<IDwnCallback> callbacks = dm.getStatusCallback();
+                        if (null != callbacks) {
+                            for (int i = 0; i < callbacks.size(); i++) {
+                                callbacks.get(i).onDwnStatusChange(uri, status);
+                            }
+                        }
                     }
                 }
-            }
-
+            });
 		}
 		
 	}

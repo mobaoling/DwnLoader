@@ -1,21 +1,20 @@
 package com.sf.dwnload;
 
+import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
+import android.text.TextUtils;
+
+import com.sf.dwnload.Dwnloader.DwnStatus;
+import com.sf.dwnload.dwninfo.BaseDwnInfo;
+
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map.Entry;
-
-import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
-import android.os.Message;
-import android.text.TextUtils;
-import android.util.Log;
-
-import com.sf.dwnload.Dwnloader.DwnStatus;
-import com.sf.dwnload.dwninfo.BaseDwnInfo;
 
 public class DwnAsker {
 	
@@ -58,16 +57,16 @@ public class DwnAsker {
 	 * @param watcher
 	 */
 	public void regeisterProgress(String url, IDwnWatcher watcher) {
-		checkInMainThread();
-		
+
 		if (!TextUtils.isEmpty(url) && null != watcher) {
-			mWatchList.put(url, watcher);
-		}
-		
-		if (mWatchList.size() > 0) {
-			mLoopHandler.start();
-		} else {
-			mLoopHandler.stop();
+            synchronized (mWatchList){
+                mWatchList.put(url, watcher);
+                if (mWatchList.size() > 0) {
+                    mLoopHandler.start();
+                } else {
+                    mLoopHandler.stop();
+                }
+            }
 		}
 	}
 	/**
@@ -218,7 +217,7 @@ public class DwnAsker {
 	 *
 	 */
 	public static interface IDwnWatcher {
-		public void onProgressChange(String uri, long current, long totao);
+		public void onProgressChange(String uri, long current, long total);
 		
 		public BaseDwnInfo getDwnInfo(String uri);
 	}
